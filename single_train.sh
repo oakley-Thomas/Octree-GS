@@ -1,4 +1,4 @@
-scene="db/playroom"
+scene="mipnerf360/flowers"
 exp_name="baseline"
 gpu=-1
 ratio=1
