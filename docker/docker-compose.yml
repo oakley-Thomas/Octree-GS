@@ -1,13 +1,28 @@
 version: '3.8'
 
 services:
+  ffmpeg:
+    image: jrottenberg/ffmpeg:latest
+    container_name: video_processor
+    volumes:
+      - ./input_video:/input
+      - extracted_frames:/output
+    working_dir: /output
+    command: >
+      -i /input/video.mp4
+      -vf fps=${FPS:-2}
+      /output/frame_%04d.jpg
+
   colmap:
     image: colmap/colmap:latest
-    container_name: colmap
+    container_name: colmap_processor
     volumes:
-      - ./input_images:/input
+      - extracted_frames:/input
       - colmap_output:/output
     working_dir: /output
+    depends_on:
+      - ffmpeg
 
 volumes:
+  extracted_frames:
   colmap_output:
