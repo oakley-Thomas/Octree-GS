@@ -3,9 +3,9 @@ version: '3.8'
 services:
   ffmpeg:
     image: jrottenberg/ffmpeg:latest
-    container_name: video_processor
+    container_name: ffmpeg
     volumes:
-      - ./input_video:/input
+      - ${INPUT_VIDEO_PATH}:/input
       - extracted_frames:/output
     working_dir: /output
     command: >
