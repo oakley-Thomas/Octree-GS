@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  colmap:
+    image: colmap/colmap:latest
+    container_name: colmap
+    volumes:
+      - ./input_images:/input
+      - colmap_output:/output
+    working_dir: /output
+
+volumes:
+  colmap_output:

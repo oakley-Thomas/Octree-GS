@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y \
     software-properties-common \
     wget \
     build-essential \
-    && rm -rf /var/lib/apt/lists/* 
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install GCC 9.4.0
 RUN add-apt-repository ppa:ubuntu-toolchain-r/test && \
@@ -21,11 +22,26 @@ RUN add-apt-repository ppa:ubuntu-toolchain-r/test && \
                         --slave /usr/bin/g++ g++ /usr/bin/g++-9 && \
     rm -rf /var/lib/apt/lists/*
 
+# Install Miniconda (older version compatible with GLIBC 2.27)
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-py39_23.5.2-0-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm /tmp/miniconda.sh
+
+# Add conda to PATH
+ENV PATH=/opt/conda/bin:${PATH}
+
+# Initialize conda for bash
+RUN /opt/conda/bin/conda init bash
+
 # Verify installations
 RUN gcc --version && \
-    nvcc --version
+    nvcc --version && \
+    conda --version
 
 # Set working directory
 WORKDIR /workspace
+
+# Clone Octree-GS repository
+RUN git clone https://github.com/city-super/Octree-GS.git
 
 CMD ["/bin/bash"]
