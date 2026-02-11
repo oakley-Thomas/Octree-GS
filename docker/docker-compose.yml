@@ -22,6 +22,13 @@ services:
     working_dir: /output
     depends_on:
       - ffmpeg
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 volumes:
   extracted_frames:
