@@ -41,7 +41,9 @@ RUN gcc --version && \
 # Set working directory
 WORKDIR /workspace
 
-# Clone Octree-GS repository
-RUN git clone https://github.com/city-super/Octree-GS.git
+# Clone Octree-GS repository + build environment
+RUN git clone https://github.com/city-super/Octree-GS.git && \
+    cd Octree-GS && \
+    conda env create --file environment.yml
 
 CMD ["/bin/bash"]

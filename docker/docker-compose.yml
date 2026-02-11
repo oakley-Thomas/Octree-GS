@@ -18,8 +18,8 @@ services:
     container_name: colmap_processor
     volumes:
       - video_frames:/input
-      - colmap_sparse_model:/output
-    working_dir: /output
+      - colmap_dataset:/dataset
+    working_dir: /dataset
     depends_on:
       ffmpeg:
         condition: service_completed_successfully
@@ -32,25 +32,27 @@ services:
               capabilities: [gpu]
     command: >
       bash -c "
-      echo '=== Step 1: Feature Extraction ===' &&
-      colmap feature_extractor --database_path /output/database.db --image_path /input --ImageReader.single_camera 1 &&
-      echo '=== Step 2: Feature Matching ===' &&
-      colmap exhaustive_matcher --database_path /output/database.db &&
-      echo '=== Step 3: Sparse Reconstruction ===' &&
-      colmap mapper --database_path /output/database.db --image_path /input --output_path /output/sparse &&
-      echo '=== Step 4: Verification ===' &&
-      ls -lh /output/sparse/0/ &&
-      echo 'Pipeline complete! Camera poses in /output/sparse/0/'
+      echo '=== Step 1: Copy images to dataset structure ===' &&
+      mkdir -p /dataset/images &&
+      cp -r /input/* /dataset/images/ &&
+      echo '=== Step 2: Feature Extraction ===' &&
+      colmap feature_extractor --database_path /dataset/database.db --image_path /dataset/images --ImageReader.single_camera 1 &&
+      echo '=== Step 3: Feature Matching ===' &&
+      colmap exhaustive_matcher --database_path /dataset/database.db &&
+      echo '=== Step 4: Sparse Reconstruction ===' &&
+      mkdir -p /dataset/sparse &&
+      colmap mapper --database_path /dataset/database.db --image_path /dataset/images --output_path /dataset/sparse &&
+      echo '=== Step 5: Verification ===' &&
+      ls -lh /dataset/sparse/0/ &&
+      echo 'Pipeline complete! Dataset structure ready at /dataset with images/ and sparse/0/'
       "
-
   octree-gs:
     image: octree-gs:latest
     container_name: octree_gs_trainer
     volumes:
-      - video_frames:/input_images:ro
-      - colmap_sparse_model:/colmap_model:ro
+      - colmap_dataset:/dataset:ro
       - gaussian_splatting_output:/output
-    working_dir: /workspace
+    working_dir: /workspace/Octree-GS
     depends_on:
       colmap:
         condition: service_completed_successfully
@@ -62,11 +64,13 @@ services:
               count: 1
               capabilities: [gpu]
     command: >
+      bash -lc "source /opt/conda/etc/profile.d/conda.sh &&
+      conda activate octree-gs &&
       python train.py
-      --source_path /colmap_model
-      --model_path /output
+      --source_path /dataset
+      --model_path /output"
 
 volumes:
-  video_frames:                    # Extracted frames from video
-  colmap_sparse_model:             # COLMAP reconstruction (cameras, poses, points)
-  gaussian_splatting_output:       # Octree-GS trained models
+  video_frames:
+  colmap_dataset:
+  gaussian_splatting_output:
