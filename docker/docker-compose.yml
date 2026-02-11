@@ -6,7 +6,7 @@ services:
     container_name: ffmpeg
     volumes:
       - ${INPUT_VIDEO_PATH}:/input
-      - extracted_frames:/output
+      - video_frames:/output
     working_dir: /output
     command: >
       -i /input/video.mp4
@@ -17,11 +17,12 @@ services:
     image: colmap/colmap:latest
     container_name: colmap_processor
     volumes:
-      - extracted_frames:/input
-      - colmap_output:/output
+      - video_frames:/input
+      - colmap_sparse_model:/output
     working_dir: /output
     depends_on:
-      - ffmpeg
+      ffmpeg:
+        condition: service_completed_successfully
     deploy:
       resources:
         reservations:
@@ -29,7 +30,43 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    command: >
+      bash -c "
+      echo '=== Step 1: Feature Extraction ===' &&
+      colmap feature_extractor --database_path /output/database.db --image_path /input --ImageReader.single_camera 1 &&
+      echo '=== Step 2: Feature Matching ===' &&
+      colmap exhaustive_matcher --database_path /output/database.db &&
+      echo '=== Step 3: Sparse Reconstruction ===' &&
+      colmap mapper --database_path /output/database.db --image_path /input --output_path /output/sparse &&
+      echo '=== Step 4: Verification ===' &&
+      ls -lh /output/sparse/0/ &&
+      echo 'Pipeline complete! Camera poses in /output/sparse/0/'
+      "
+
+  octree-gs:
+    image: octree-gs:latest
+    container_name: octree_gs_trainer
+    volumes:
+      - video_frames:/input_images:ro
+      - colmap_sparse_model:/colmap_model:ro
+      - gaussian_splatting_output:/output
+    working_dir: /workspace
+    depends_on:
+      colmap:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >
+      python train.py
+      --source_path /colmap_model
+      --model_path /output
 
 volumes:
-  extracted_frames:
-  colmap_output:
+  video_frames:                    # Extracted frames from video
+  colmap_sparse_model:             # COLMAP reconstruction (cameras, poses, points)
+  gaussian_splatting_output:       # Octree-GS trained models
