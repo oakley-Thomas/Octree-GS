@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   ffmpeg:
     image: jrottenberg/ffmpeg:latest
@@ -50,7 +48,7 @@ services:
     image: octree-gs:latest
     container_name: octree_gs_trainer
     volumes:
-      - colmap_dataset:/dataset:ro
+      - colmap_dataset:/dataset
       - gaussian_splatting_output:/output
     working_dir: /workspace/Octree-GS
     depends_on:
