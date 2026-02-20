@@ -1,0 +1,74 @@
+services:
+  ffmpeg:
+    image: jrottenberg/ffmpeg:latest
+    container_name: ffmpeg
+    volumes:
+      - ${INPUT_VIDEO_PATH}:/input
+      - video_frames:/output
+    working_dir: /output
+    command: >
+      -i /input/video.mp4
+      -vf fps=${FPS:-2}
+      /output/frame_%04d.jpg
+
+  colmap:
+    image: colmap/colmap:latest
+    container_name: colmap_processor
+    volumes:
+      - video_frames:/input
+      - colmap_dataset:/dataset
+    working_dir: /dataset
+    depends_on:
+      ffmpeg:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >
+      bash -c "
+      echo '=== Step 1: Copy images to dataset structure ===' &&
+      mkdir -p /dataset/images &&
+      cp -r /input/* /dataset/images/ &&
+      echo '=== Step 2: Feature Extraction ===' &&
+      colmap feature_extractor --database_path /dataset/database.db --image_path /dataset/images --ImageReader.single_camera 1 &&
+      echo '=== Step 3: Feature Matching ===' &&
+      colmap exhaustive_matcher --database_path /dataset/database.db &&
+      echo '=== Step 4: Sparse Reconstruction ===' &&
+      mkdir -p /dataset/sparse &&
+      colmap mapper --database_path /dataset/database.db --image_path /dataset/images --output_path /dataset/sparse &&
+      echo '=== Step 5: Verification ===' &&
+      ls -lh /dataset/sparse/0/ &&
+      echo 'Pipeline complete! Dataset structure ready at /dataset with images/ and sparse/0/'
+      "
+  octree-gs:
+    image: octree-gs:latest
+    container_name: octree_gs_trainer
+    volumes:
+      - colmap_dataset:/dataset
+      - gaussian_splatting_output:/output
+    working_dir: /workspace/Octree-GS
+    depends_on:
+      colmap:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >
+      bash -lc "source /opt/conda/etc/profile.d/conda.sh &&
+      conda activate octree-gs &&
+      python train.py
+      --source_path /dataset
+      --model_path /output"
+
+volumes:
+  video_frames:
+  colmap_dataset:
+  gaussian_splatting_output:
