@@ -1,22 +1,32 @@
 services:
   ffmpeg:
     image: jrottenberg/ffmpeg:latest
-    container_name: ffmpeg
     volumes:
-      - ${INPUT_VIDEO_PATH}:/input
-      - video_frames:/output
-    working_dir: /output
-    command: >
-      -i /input/video.mp4
-      -vf fps=${FPS:-2}
-      /output/frame_%04d.jpg
+      - type: bind
+        source: ${INPUT_VIDEO_DIR}
+        target: /input
+        read_only: true
+      - type: bind
+        source: ${RUN_OUTPUT_DIR}/frames
+        target: /frames
+    working_dir: /frames
+    command:
+      - -i
+      - /input/${INPUT_VIDEO_FILE:-video.mp4}
+      - -vf
+      - fps=${FPS:-2}
+      - /frames/frame_%04d.jpg
 
   colmap:
     image: colmap/colmap:latest
-    container_name: colmap_processor
     volumes:
-      - video_frames:/input
-      - colmap_dataset:/dataset
+      - type: bind
+        source: ${RUN_OUTPUT_DIR}/frames
+        target: /input
+        read_only: true
+      - type: bind
+        source: ${RUN_OUTPUT_DIR}/dataset
+        target: /dataset
     working_dir: /dataset
     depends_on:
       ffmpeg:
@@ -46,10 +56,13 @@ services:
       "
   octree-gs:
     image: octree-gs:latest
-    container_name: octree_gs_trainer
     volumes:
-      - colmap_dataset:/dataset
-      - gaussian_splatting_output:/output
+      - type: bind
+        source: ${RUN_OUTPUT_DIR}/dataset
+        target: /dataset
+      - type: bind
+        source: ${RUN_OUTPUT_DIR}/splat
+        target: /output
     working_dir: /workspace/Octree-GS
     depends_on:
       colmap:
@@ -67,8 +80,3 @@ services:
       python train.py
       --source_path /dataset
       --model_path /output"
-
-volumes:
-  video_frames:
-  colmap_dataset:
-  gaussian_splatting_output:
